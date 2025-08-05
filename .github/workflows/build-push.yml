@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Exit if wrong branch
-        if: github.ref != 'refs/heads/testnet'
+        if: github.ref != 'refs/heads/testnet' && !startsWith(github.ref, 'refs/heads/mainnet')
         run: exit 1
 
   indexer:
