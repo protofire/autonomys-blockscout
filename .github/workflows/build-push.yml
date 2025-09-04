@@ -3,7 +3,7 @@ on:
     inputs:
       version:
         description: "Backend version"
-        default: "8.0.1"
+        default: "9.0.2"
         required: true
 
 name: Docker build and push
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Exit if wrong branch
-        if: github.ref != 'refs/heads/testnet'
+        if: ${{ !startsWith(github.ref, 'refs/heads/testnet') }}
         run: exit 1
 
   indexer:
