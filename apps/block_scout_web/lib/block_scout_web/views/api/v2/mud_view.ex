@@ -84,8 +84,6 @@ defmodule BlockScoutWeb.API.V2.MudView do
     %{
       "address" => Helper.address_with_info(address, address.hash),
       "transactions_count" => address.transactions_count,
-      # todo: It should be removed in favour `transactions_count` property with the next release after 8.0.0
-      "transaction_count" => address.transactions_count,
       "coin_balance" => if(address.fetched_coin_balance, do: address.fetched_coin_balance.value)
     }
   end
@@ -93,7 +91,7 @@ defmodule BlockScoutWeb.API.V2.MudView do
   defp prepare_system_for_list({system_id, system}) do
     %{
       name: system_id |> Table.from() |> Map.get(:table_full_name),
-      address: system
+      address_hash: system
     }
   end
 

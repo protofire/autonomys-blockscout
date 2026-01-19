@@ -15,7 +15,6 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
     Hash,
     Import,
     InternalTransaction,
-    PendingBlockOperation,
     PendingOperationsHelper,
     PendingTransactionOperation,
     Transaction
@@ -23,6 +22,8 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
 
   alias Explorer.Chain.Events.Publisher
   alias Explorer.Chain.Import.Runner
+  alias Explorer.Chain.InternalTransaction.ZeroValueDeleteQueue
+  alias Explorer.Migrator.DeleteZeroValueInternalTransactions
   alias Explorer.Prometheus.Instrumenter
   alias Explorer.Repo, as: ExplorerRepo
   alias Explorer.Utility.MissingRangesManipulator
@@ -192,6 +193,14 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
         :update_pending_blocks_status
       )
     end)
+    |> Multi.run(:save_zero_value_to_delete, fn repo, %{internal_transactions: internal_transactions} ->
+      Instrumenter.block_import_stage_runner(
+        fn -> save_zero_value_to_delete(repo, internal_transactions, insert_options) end,
+        :block_pending,
+        :internal_transactions,
+        :save_zero_value_to_delete
+      )
+    end)
   end
 
   def run_insert_only(changes_list, %{timestamps: timestamps} = options) when is_map(options) do
@@ -324,14 +333,11 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
     case PendingOperationsHelper.pending_operations_type() do
       "blocks" ->
         query =
-          from(
-            pending_ops in PendingBlockOperation,
-            where: pending_ops.block_hash in ^block_hashes,
-            select: pending_ops.block_hash,
-            # Enforce PendingBlockOperation ShareLocks order (see docs: sharelocks.md)
-            order_by: [asc: pending_ops.block_hash],
-            lock: "FOR UPDATE"
-          )
+          block_hashes
+          |> PendingOperationsHelper.block_hash_in_query()
+          |> select([pbo], pbo.block_hash)
+          |> order_by([pbo], asc: pbo.block_hash)
+          |> lock("FOR UPDATE")
 
         {:ok, {:block_hashes, repo.all(query)}}
 
@@ -460,6 +466,7 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
         entry
         |> Map.put(:block_hash, block_hash)
         |> Map.put(:block_index, index)
+        |> sanitize_error()
       end)
     else
       []
@@ -497,6 +504,21 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
     else
       {:ok, internal_transactions}
     end
+  end
+
+  defp sanitize_error(entry) do
+    error = Map.get(entry, :error)
+
+    sanitized_error =
+      if is_binary(error) and not String.printable?(error) do
+        error
+        |> inspect(binaries: :as_strings)
+        |> String.trim("\"")
+      else
+        error
+      end
+
+    Map.put(entry, :error, sanitized_error)
   end
 
   def defer_internal_transactions_primary_key(repo) do
@@ -829,10 +851,7 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
             |> MapSet.difference(MapSet.new(invalid_block_hashes))
             |> MapSet.to_list()
 
-          from(
-            pending_ops in PendingBlockOperation,
-            where: pending_ops.block_hash in ^valid_block_hashes
-          )
+          PendingOperationsHelper.block_hash_in_query(valid_block_hashes)
 
         {:transaction_hashes, transaction_hashes} ->
           from(
@@ -849,6 +868,36 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
     rescue
       postgrex_error in Postgrex.Error ->
         {:error, %{exception: postgrex_error, pending_hashes: pending_hashes}}
+    end
+  end
+
+  defp save_zero_value_to_delete(repo, internal_transactions, %{timeout: timeout, timestamps: timestamps}) do
+    with true <- Application.get_env(:explorer, DeleteZeroValueInternalTransactions)[:enabled],
+         border_number when is_integer(border_number) <- DeleteZeroValueInternalTransactions.border_number() do
+      internal_transactions
+      |> Enum.map(& &1.block_number)
+      |> Enum.uniq()
+      |> Enum.filter(&(not is_nil(&1) and &1 <= border_number))
+      |> Enum.map(&Map.put(timestamps, :block_number, &1))
+      |> case do
+        [] ->
+          {:ok, []}
+
+        insert_params ->
+          {_total, result} =
+            repo.insert_all(
+              ZeroValueDeleteQueue,
+              insert_params,
+              conflict_target: [:block_number],
+              on_conflict: {:replace, [:updated_at]},
+              returning: [:block_number],
+              timeout: timeout
+            )
+
+          {:ok, result}
+      end
+    else
+      _ -> {:ok, []}
     end
   end
 

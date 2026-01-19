@@ -43,6 +43,7 @@ defmodule Indexer.Fetcher.OnDemand.ContractCreator do
 
     with false <- is_nil(address.contract_code),
          true <- is_nil(creator_hash),
+         false <- Address.eoa_with_code?(address),
          {:address_lookup, [{_, contract_creation_block_number}]} <-
            {:address_lookup, :ets.lookup(@table_name, address_cache_name(address.hash))},
          {:pending_blocks_lookup, [{@pending_blocks_cache_key, blocks}]} <-
@@ -198,7 +199,7 @@ defmodule Indexer.Fetcher.OnDemand.ContractCreator do
         |> Map.get(:blocks, [])
         |> Enum.map(&Map.get(&1, :number))
 
-      unless Enum.empty?(imported_block_numbers) do
+      if !Enum.empty?(imported_block_numbers) do
         cache_key = @pending_blocks_cache_key
         # credo:disable-for-next-line Credo.Check.Refactor.Nesting
         case pending_blocks_cache() do
