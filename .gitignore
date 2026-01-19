@@ -77,3 +77,4 @@ tasks_in_progress
 /temp
 
 openapi.yaml
+init.sh
