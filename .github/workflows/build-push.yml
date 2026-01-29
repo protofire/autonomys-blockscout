@@ -2,8 +2,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Backend version"
-        default: "8.0.1"
+        description: 'Backend version'
+        default: '9.3.2'
         required: true
 
 name: Docker build and push
@@ -18,7 +18,7 @@ jobs:
     runs-on: w3-runner
     steps:
       - name: Exit if wrong branch
-        if: github.ref != 'refs/heads/testnet'
+        if: github.ref != 'refs/heads/testnet-v9.3.2'
         run: exit 1
 
   indexer:
