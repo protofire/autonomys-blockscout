@@ -1030,11 +1030,11 @@ config :indexer, Indexer.Fetcher.TokenCountersUpdater,
 
 config :indexer, Indexer.Fetcher.OnDemand.TokenBalance,
   threshold: ConfigHelper.parse_time_env_var("TOKEN_BALANCE_ON_DEMAND_FETCHER_THRESHOLD", "5m"),
-  fallback_threshold_in_blocks: 2
+  fallback_threshold_in_blocks: 5
 
 config :indexer, Indexer.Fetcher.OnDemand.CoinBalance,
   threshold: ConfigHelper.parse_time_env_var("COIN_BALANCE_ON_DEMAND_FETCHER_THRESHOLD", "5m"),
-  fallback_threshold_in_blocks: 2
+  fallback_threshold_in_blocks: 5
 
 config :indexer, Indexer.Fetcher.OnDemand.ContractCode,
   threshold: ConfigHelper.parse_time_env_var("CONTRACT_CODE_ON_DEMAND_FETCHER_THRESHOLD", "5s")
