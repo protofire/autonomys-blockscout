@@ -75,3 +75,6 @@ tasks_in_progress
 /dets
 
 /temp
+
+openapi.yaml
+init.sh

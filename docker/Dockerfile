@@ -1,9 +1,9 @@
-FROM hexpm/elixir:1.17.3-erlang-27.1-alpine-3.20.3 AS builder-deps
+FROM hexpm/elixir:1.19.4-erlang-27.3.4.6-alpine-3.22.2 AS builder-deps
 
 WORKDIR /app
 
 RUN apk --no-cache --update add \
-    alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3 file gcompat libstdc++ curl ca-certificates git make
+    alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3 file gcompat libstdc++ curl ca-certificates git make bash
 
 # Cache elixir deps
 COPY mix.exs mix.lock ./
@@ -17,7 +17,7 @@ COPY apps/nft_media_handler/mix.exs ./apps/nft_media_handler/
 ENV MIX_ENV="prod"
 ENV MIX_HOME=/opt/mix
 RUN mix local.hex --force
-RUN mix do deps.get, local.rebar --force, deps.compile --skip-umbrella-children
+RUN MIX_OS_DEPS_COMPILE_PARTITION_COUNT=$(nproc) mix do deps.get + local.rebar --force + deps.compile --skip-umbrella-children
 
 COPY config ./config
 COPY rel ./rel
@@ -49,7 +49,7 @@ RUN mkdir -p /opt/release && \
     mv _build/${MIX_ENV}/rel/blockscout /opt/release
 
 ##############################################################
-FROM hexpm/elixir:1.17.3-erlang-27.1-alpine-3.20.3
+FROM hexpm/elixir:1.19.4-erlang-27.3.4.6-alpine-3.22.2
 
 WORKDIR /app
 
@@ -60,7 +60,7 @@ ARG BLOCKSCOUT_GID=10001
 
 RUN apk --no-cache --update add jq curl && \
     addgroup --system --gid ${BLOCKSCOUT_GID} ${BLOCKSCOUT_GROUP} && \
-    adduser --system --uid ${BLOCKSCOUT_UID} --ingroup ${BLOCKSCOUT_GROUP} --disabled-password ${BLOCKSCOUT_USER}
+    adduser --system --uid ${BLOCKSCOUT_UID} --ingroup ${BLOCKSCOUT_GROUP} --disabled-password --home /app ${BLOCKSCOUT_USER}
 
 ENV DISABLE_WEBAPP=true
 ENV ADMIN_PANEL_ENABLED=false

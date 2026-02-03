@@ -2,8 +2,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Backend version"
-        default: "8.0.1"
+        description: 'Backend version'
+        default: '9.3.2'
         required: true
 
 name: Docker build and push

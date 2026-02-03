@@ -16,13 +16,12 @@ defmodule Explorer.Chain.Scroll.Batch do
   alias Explorer.Chain.Block.Range, as: BlockRange
   alias Explorer.Chain.Hash
   alias Explorer.Chain.Scroll.BatchBundle
-  alias ExZstd.DCtx
 
   @optional_attrs ~w(bundle_id l2_block_range)a
 
   @required_attrs ~w(number commit_transaction_hash commit_block_number commit_timestamp container)a
   @zstd_magic_number <<0x28, 0xB5, 0x2F, 0xFD>>
-  @codec_version 7
+  @codec_min_version 7
 
   @typedoc """
     Descriptor of the batch:
@@ -104,17 +103,17 @@ defmodule Explorer.Chain.Scroll.Batch do
     <<version, blob_payload_size::size(24), is_compressed::size(8), rest::binary>> = blob_data_raw
 
     # ensure we have correct version, blob envelope size doesn't exceed the raw data size, and compression flag is correct
-    with {:version_is_supported, true} <- {:version_is_supported, version == @codec_version},
+    with {:version_is_supported, true} <- {:version_is_supported, version >= @codec_min_version},
          {:size_is_correct, true} <- {:size_is_correct, blob_payload_size + 5 <= byte_size(blob_data_raw)},
          {:compression_flag_is_correct, true} <-
            {:compression_flag_is_correct, is_compressed in [0, 1]},
          <<payload::binary-size(blob_payload_size), _::binary>> = rest,
          {:is_compressed, 1, _payload} <- {:is_compressed, is_compressed, payload},
-         {:ok, decompressed} <- DCtx.decompress(DCtx.new(), @zstd_magic_number <> payload) do
+         decompressed when is_binary(decompressed) <- :ezstd.decompress(@zstd_magic_number <> payload) do
       decompressed
     else
       {:version_is_supported, false} ->
-        Logger.error("Codec version #{version} is not supported. Expected: #{@codec_version}.")
+        Logger.error("Codec version #{version} is not supported. Expected: >=#{@codec_min_version}")
         nil
 
       {:size_is_correct, false} ->
