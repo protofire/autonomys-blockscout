@@ -3,7 +3,7 @@ on:
     inputs:
       version:
         description: 'Backend version'
-        default: '9.3.2'
+        default: '10.2.4'
         required: true
 
 name: Docker build and push
